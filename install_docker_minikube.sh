@@ -71,6 +71,14 @@ else
   helm version
 fi
 
+# start minikube (required before helm/kubectl can talk to the cluster)
+if minikube status | grep -q "Running"; then
+  echo "Minikube already running, skipping..."
+else
+  echo "Starting Minikube..."
+  minikube start
+fi
+
 # install chaos mesh from helm
 if helm list -n chaos-mesh 2>/dev/null | grep -q chaos-mesh; then
   echo "Chaos Mesh already installed, skipping..."

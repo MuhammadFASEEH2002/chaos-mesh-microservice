@@ -5,25 +5,10 @@ if command -v docker &> /dev/null; then
   echo "Docker already installed, skipping..."
 else
   echo "Installing Docker..."
-  # Add Docker's official GPG key:
-  sudo apt update
-  sudo apt install -y ca-certificates curl
-  sudo install -m 0755 -d /etc/apt/keyrings
-  sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-  sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-  # Add the repository to Apt sources:
-  sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-Components: stable
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-
-  sudo apt update
-  sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  sudo yum update -y
+  sudo yum install -y docker
   sudo systemctl start docker
+  sudo systemctl enable docker
   sudo systemctl status docker
 fi
 
@@ -63,11 +48,7 @@ if command -v helm &> /dev/null; then
   echo "Helm already installed, skipping..."
 else
   echo "Installing Helm..."
-  sudo apt-get install -y curl gpg apt-transport-https
-  curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-  echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-  sudo apt-get update
-  sudo apt-get install -y helm
+  curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
   helm version
 fi
 

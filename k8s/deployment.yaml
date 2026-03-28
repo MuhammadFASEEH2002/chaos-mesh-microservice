@@ -15,7 +15,7 @@ spec:
       containers:
       - name: chaosmesh-project
         image: chaosmesh-project:v1
-        imagePullPolicy: Always
+        imagePullPolicy: Never
         ports:
         - containerPort: 3000
         livenessProbe:

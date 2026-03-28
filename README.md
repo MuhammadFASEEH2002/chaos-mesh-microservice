@@ -12,12 +12,20 @@ chaos-mesh-microservice/
 ├── index.js
 ├── package.json
 ├── pnpm-lock.yaml
-├── install_docker_minikube.sh
-├── install_docker_minikube_amazon_linux.sh
-├── uninstall_docker_minikube.sh
-├── uninstall_docker_minikube_amazon_linux.sh
 ├── k8s/
 │   └── deployment.yaml
+├── scripts/
+│   ├── install/
+│   │   ├── install_docker_minikube.sh
+│   │   └── install_docker_minikube_amazon_linux.sh
+│   ├── uninstall/
+│   │   ├── uninstall_docker_minikube.sh
+│   │   └── uninstall_docker_minikube_amazon_linux.sh
+│   └── services/
+│       ├── start-app.sh
+│       ├── stop-app.sh
+│       ├── start-dashboard.sh
+│       └── stop-dashboard.sh
 └── README.md
 ```
 
@@ -40,14 +48,14 @@ cd chaos-mesh-microservice
 
 **Ubuntu:**
 ```bash
-chmod +x install_docker_minikube.sh
-./install_docker_minikube.sh
+chmod +x scripts/install/install_docker_minikube.sh
+./scripts/install/install_docker_minikube.sh
 ```
 
 **Amazon Linux:**
 ```bash
-chmod +x install_docker_minikube_amazon_linux.sh
-./install_docker_minikube_amazon_linux.sh
+chmod +x scripts/install/install_docker_minikube_amazon_linux.sh
+./scripts/install/install_docker_minikube_amazon_linux.sh
 ```
 
 The script automatically installs (skips if already present):
@@ -101,10 +109,12 @@ curl http://$(minikube ip):30000/api/message
 ### From your local machine
 
 ```bash
-kubectl port-forward --address 0.0.0.0 svc/chaosmesh-project 3000:80
+./scripts/services/start-app.sh
 ```
 
 Then open: `http://<server-public-ip>:3000/health`
+
+To stop: `./scripts/services/stop-app.sh`
 
 ## API Endpoints
 
@@ -118,10 +128,12 @@ Then open: `http://<server-public-ip>:3000/health`
 ### Access the dashboard
 
 ```bash
-kubectl port-forward --address 0.0.0.0 svc/chaos-dashboard 2333:2333 -n chaos-mesh
+./scripts/services/start-dashboard.sh
 ```
 
 Open: `http://<server-public-ip>:2333`
+
+To stop: `./scripts/services/stop-dashboard.sh`
 
 ### Get login token
 
@@ -133,44 +145,96 @@ Copy the token and paste it on the dashboard login page.
 
 ## Kubernetes Configuration
 
-- **Deployment**: 2 replicas of the Node.js app
+- **Deployment**: 5 replicas of the Node.js app
 - **Service**: NodePort type, exposed on port 30000
 - **Health checks**: Liveness and readiness probes on `/health`
 - **Container port**: 3000
 
-## Delete Docker Image and Deployments
+## Useful Commands
 
-### 1. Delete the Kubernetes deployment and service
-
-```bash
-kubectl delete -f k8s/deployment.yaml
-```
-
-### 2. Verify pods are gone
+### Pod Management
 
 ```bash
+# List all pods
 kubectl get pods
+
+# Delete all pods for this deployment (they will be recreated)
+kubectl delete pods -l app=chaosmesh-microservice
+
+# Delete failed/pending pods only
+kubectl delete pods --field-selector=status.phase!=Running
+
+# Scale pods up or down
+kubectl scale deployment chaosmesh-microservice --replicas=3
+
+# Restart all pods (rolling restart)
+kubectl rollout restart deployment chaosmesh-microservice
+
+# View pod logs
+kubectl logs -l app=chaosmesh-microservice
+
+# Describe a pod (for debugging)
+kubectl describe pod -l app=chaosmesh-microservice
 ```
 
-### 3. Remove the image from minikube
+### Deployment Management
 
 ```bash
-minikube image rm docker.io/library/chaosmesh-project:v1
+# Apply/update deployment
+kubectl apply -f k8s/deployment.yaml
+
+# Delete deployment and service
+kubectl delete -f k8s/deployment.yaml
+
+# Check deployment status
+kubectl rollout status deployment chaosmesh-microservice
 ```
 
-### 4. Remove the image from local Docker
+### Docker Image Management
 
 ```bash
-docker rmi chaosmesh-project:v1
-```
+# Build image locally
+docker build -t chaosmesh-microservice .
 
-### 5. Verify images are removed
+# Build image directly in minikube (low memory)
+minikube image build -t chaosmesh-microservice .
 
-```bash
-# Check local Docker
+# Load local image into minikube
+minikube image load chaosmesh-microservice
+
+# List local Docker images
 docker images | grep chaosmesh
 
-# Check minikube
+# List minikube images
+minikube image ls | grep chaosmesh
+
+# Remove image from local Docker
+docker rmi chaosmesh-microservice
+
+# Remove image from minikube
+minikube image rm docker.io/library/chaosmesh-microservice
+
+# Remove all unused Docker images
+docker image prune -f
+```
+
+### Full Cleanup (images + deployment)
+
+```bash
+# 1. Delete deployment and service
+kubectl delete -f k8s/deployment.yaml
+
+# 2. Verify pods are gone
+kubectl get pods
+
+# 3. Remove image from minikube
+minikube image rm docker.io/library/chaosmesh-microservice
+
+# 4. Remove image from local Docker
+docker rmi chaosmesh-microservice
+
+# 5. Verify
+docker images | grep chaosmesh
 minikube image ls | grep chaosmesh
 ```
 
@@ -178,14 +242,14 @@ minikube image ls | grep chaosmesh
 
 **Ubuntu:**
 ```bash
-chmod +x uninstall_docker_minikube.sh
-./uninstall_docker_minikube.sh
+chmod +x scripts/uninstall/uninstall_docker_minikube.sh
+./scripts/uninstall/uninstall_docker_minikube.sh
 ```
 
 **Amazon Linux:**
 ```bash
-chmod +x uninstall_docker_minikube_amazon_linux.sh
-./uninstall_docker_minikube_amazon_linux.sh
+chmod +x scripts/uninstall/uninstall_docker_minikube_amazon_linux.sh
+./scripts/uninstall/uninstall_docker_minikube_amazon_linux.sh
 ```
 
 This removes: Chaos Mesh, Minikube, Helm, kubectl, and Docker (in reverse order).

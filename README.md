@@ -72,10 +72,10 @@ The script automatically installs (skips if already present):
 eval $(minikube docker-env -u)
 
 # Build the image locally
-docker build -t chaosmesh-project:v1 .
+docker build -t chaosmesh-microservice .
 
 # Load the image into minikube
-minikube image load chaosmesh-project:v1
+minikube image load chaosmesh-microservice
 
 # Deploy to Kubernetes
 kubectl apply -f k8s/deployment.yaml
@@ -86,7 +86,7 @@ kubectl apply -f k8s/deployment.yaml
 **Low memory alternative:** If `minikube image load` gets killed (OOM), build directly inside minikube instead:
 
 ```bash
-minikube image build -t chaosmesh-project:v1 .
+minikube image build -t chaosmesh-microservice .
 kubectl apply -f k8s/deployment.yaml
 ```
 
@@ -158,11 +158,14 @@ Copy the token and paste it on the dashboard login page.
 # List all pods
 kubectl get pods
 
-# Delete all pods for this deployment (they will be recreated)
+# Delete all pods (deployment will recreate them automatically)
 kubectl delete pods -l app=chaosmesh-microservice
 
 # Delete failed/pending pods only
 kubectl delete pods --field-selector=status.phase!=Running
+
+# To permanently stop all pods (keeps deployment for later)
+kubectl scale deployment chaosmesh-microservice --replicas=0
 
 # Scale pods up or down
 kubectl scale deployment chaosmesh-microservice --replicas=3
@@ -273,13 +276,22 @@ eval $(minikube docker-env)
 eval $(minikube docker-env -u)
 ```
 
-To verify which Docker you're pointing to:
+To check which Docker environment you're currently using:
+
+```bash
+env | grep DOCKER
+```
+
+- If it shows `DOCKER_HOST`, `DOCKER_TLS_VERIFY`, etc. → you're on **minikube's Docker**
+- If it shows nothing → you're on **local Docker**
+
+Alternatively:
 
 ```bash
 docker info | grep Name
 ```
 
-- If it shows `minikube` → you're on minikube's Docker
-- If it shows your hostname (e.g. `ip-172-31-18-234`) → you're on local Docker
+- If it shows `minikube` → minikube's Docker
+- If it shows your hostname (e.g. `ip-172-31-18-234`) → local Docker
 
 > **Tip:** Build images on local Docker and load them into minikube with `minikube image load <image>`. This avoids needing to switch Docker context.

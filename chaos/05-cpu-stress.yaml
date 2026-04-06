@@ -1,0 +1,15 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: cpu-stress-experiment
+  namespace: default
+spec:
+  mode: one
+  selector:
+    labelSelectors:
+      app: chaosmesh-microservice
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+  duration: "60s"

@@ -1,0 +1,15 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: network-loss-experiment
+  namespace: default
+spec:
+  action: loss
+  mode: all
+  selector:
+    labelSelectors:
+      app: chaosmesh-microservice
+  loss:
+    loss: "30"
+    correlation: "50"
+  duration: "60s"

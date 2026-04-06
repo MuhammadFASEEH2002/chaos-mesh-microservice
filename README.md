@@ -12,6 +12,13 @@ chaos-mesh-microservice/
 ├── index.js
 ├── package.json
 ├── pnpm-lock.yaml
+├── chaos/
+│   ├── 01-pod-kill.yaml
+│   ├── 02-pod-failure.yaml
+│   ├── 03-network-delay.yaml
+│   ├── 04-network-loss.yaml
+│   ├── 05-cpu-stress.yaml
+│   └── 06-memory-stress.yaml
 ├── k8s/
 │   └── deployment.yaml
 ├── scripts/
@@ -149,6 +156,98 @@ Copy the token and paste it on the dashboard login page.
 - **Service**: NodePort type, exposed on port 30000
 - **Health checks**: Liveness and readiness probes on `/health`
 - **Container port**: 3000
+
+## Chaos Experiments
+
+All experiment YAMLs are in the `chaos/` folder. Run them in order (simple → severe).
+
+### How to run an experiment
+
+```bash
+# Apply an experiment
+kubectl apply -f chaos/<experiment-file>.yaml
+
+# Watch your pods during the experiment
+kubectl get pods -w
+
+# Check experiment status
+kubectl get podchaos,networkchaos,stresschaos
+
+# Remove an experiment (stops it immediately)
+kubectl delete -f chaos/<experiment-file>.yaml
+```
+
+### 1. Pod Kill — kills one random pod
+
+```bash
+kubectl apply -f chaos/01-pod-kill.yaml
+```
+
+- **What it does:** Kills 1 pod instantly
+- **Duration:** 30s (Kubernetes will recreate the pod)
+- **What to observe:** Run `kubectl get pods -w` — you should see a pod terminate and a new one spin up
+- **Test your app:** `curl http://<server-ip>:3000/health` — should still respond because other pods are alive
+
+### 2. Pod Failure — makes 40% of pods unavailable
+
+```bash
+kubectl apply -f chaos/02-pod-failure.yaml
+```
+
+- **What it does:** Makes 40% of pods (2 out of 5) fail for 60s
+- **Duration:** 60s then auto-recovers
+- **What to observe:** 2 pods go to NotReady state, traffic routes to remaining 3
+- **Test your app:** Hit the health endpoint repeatedly — should still work but slower
+
+### 3. Network Delay — adds 500ms latency
+
+```bash
+kubectl apply -f chaos/03-network-delay.yaml
+```
+
+- **What it does:** Adds 500ms delay (±100ms jitter) to all pod network traffic
+- **Duration:** 60s
+- **What to observe:** API responses become noticeably slower
+- **Test your app:** `time curl http://<server-ip>:3000/health` — response time should be ~500ms+
+
+### 4. Network Loss — drops 30% of packets
+
+```bash
+kubectl apply -f chaos/04-network-loss.yaml
+```
+
+- **What it does:** Drops 30% of network packets on all pods
+- **Duration:** 60s
+- **What to observe:** Some requests fail, some succeed
+- **Test your app:** Run multiple curls — some will timeout or fail
+
+### 5. CPU Stress — overloads CPU
+
+```bash
+kubectl apply -f chaos/05-cpu-stress.yaml
+```
+
+- **What it does:** Uses 2 workers at 80% CPU load on 1 pod
+- **Duration:** 60s
+- **What to observe:** `kubectl top pod` shows high CPU on one pod, response times increase
+- **Test your app:** Hit the endpoint — the stressed pod will be slower
+
+### 6. Memory Stress — consumes memory
+
+```bash
+kubectl apply -f chaos/06-memory-stress.yaml
+```
+
+- **What it does:** Consumes 128MB memory on 1 pod using 2 workers
+- **Duration:** 60s
+- **What to observe:** `kubectl top pod` shows high memory usage, pod may get OOMKilled
+- **Test your app:** If pod gets killed, Kubernetes recreates it automatically
+
+### Cleanup all experiments
+
+```bash
+kubectl delete -f chaos/
+```
 
 ## Useful Commands
 

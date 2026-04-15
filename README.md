@@ -251,93 +251,57 @@ kubectl delete -f chaos/
 
 ## Useful Commands
 
-### Pod Management
-
 ```bash
-# List all pods
+# Pod management
 kubectl get pods
-
-# Delete all pods (deployment will recreate them automatically)
-kubectl delete pods -l app=chaosmesh-microservice
-
-# Delete failed/pending pods only
-kubectl delete pods --field-selector=status.phase!=Running
-
-# To permanently stop all pods (keeps deployment for later)
-kubectl scale deployment chaosmesh-microservice --replicas=0
-
-# Scale pods up or down
+kubectl logs -l app=chaosmesh-microservice
+kubectl describe pod -l app=chaosmesh-microservice
 kubectl scale deployment chaosmesh-microservice --replicas=3
-
-# Restart all pods (rolling restart)
 kubectl rollout restart deployment chaosmesh-microservice
 
-# View pod logs
-kubectl logs -l app=chaosmesh-microservice
-
-# Describe a pod (for debugging)
-kubectl describe pod -l app=chaosmesh-microservice
-```
-
-### Deployment Management
-
-```bash
-# Apply/update deployment
+# Deployment management
 kubectl apply -f k8s/deployment.yaml
-
-# Delete deployment and service
 kubectl delete -f k8s/deployment.yaml
-
-# Check deployment status
 kubectl rollout status deployment chaosmesh-microservice
-```
 
-### Docker Image Management
-
-```bash
-# Build image locally
+# Docker image management
 docker build -t chaosmesh-microservice .
-
-# Build image directly in minikube (low memory)
-minikube image build -t chaosmesh-microservice .
-
-# Load local image into minikube
 minikube image load chaosmesh-microservice
-
-# List local Docker images
-docker images | grep chaosmesh
-
-# List minikube images
-minikube image ls | grep chaosmesh
-
-# Remove image from local Docker
-docker rmi chaosmesh-microservice
-
-# Remove image from minikube
-minikube image rm docker.io/library/chaosmesh-microservice
-
-# Remove all unused Docker images
-docker image prune -f
+minikube image build -t chaosmesh-microservice .    # low memory alternative
 ```
 
-### Full Cleanup (images + deployment)
+## Troubleshooting
+
+### kubectl: "dial tcp 192.168.49.2:8443: connect: no route to host"
+
+This means the Minikube cluster is not running. Common causes:
+- EC2 instance was **stopped and restarted** (Minikube doesn't survive reboots)
+- Docker service is not running
+
+**Fix:**
 
 ```bash
-# 1. Delete deployment and service
-kubectl delete -f k8s/deployment.yaml
+# 1. Check if Docker is running
+sudo systemctl status docker
 
-# 2. Verify pods are gone
-kubectl get pods
+# If Docker is stopped, start it
+sudo systemctl start docker
 
-# 3. Remove image from minikube
-minikube image rm docker.io/library/chaosmesh-microservice
+# 2. Check Minikube status
+minikube status
 
-# 4. Remove image from local Docker
-docker rmi chaosmesh-microservice
+# 3. Start Minikube
+minikube start
 
-# 5. Verify
-docker images | grep chaosmesh
-minikube image ls | grep chaosmesh
+# 4. If start fails, delete and recreate
+minikube delete
+minikube start --driver=docker
+```
+
+After `minikube start` succeeds, re-run the install script to reinstall Chaos Mesh, then redeploy:
+
+```bash
+kubectl apply -f k8s/deployment.yaml
 ```
 
 ## Uninstall
@@ -358,39 +322,7 @@ This removes: Chaos Mesh, Minikube, Helm, kubectl, and Docker (in reverse order)
 
 ## Minikube Notes
 
-- Minikube IP (default `192.168.49.2`) stays the same across stop/start cycles
-- It changes if you run `minikube delete` + `minikube start`
+- Minikube IP (default `192.168.49.2`) stays the same across stop/start cycles but changes after `minikube delete` + `minikube start`
 - Check IP anytime: `minikube ip`
 - Minikube needs at least 1800MB RAM available to Docker
-
-### Switching Docker Context
-
-Minikube runs its own Docker daemon. You can switch between local and minikube Docker:
-
-```bash
-# Switch to minikube's Docker
-eval $(minikube docker-env)
-
-# Switch back to local Docker
-eval $(minikube docker-env -u)
-```
-
-To check which Docker environment you're currently using:
-
-```bash
-env | grep DOCKER
-```
-
-- If it shows `DOCKER_HOST`, `DOCKER_TLS_VERIFY`, etc. → you're on **minikube's Docker**
-- If it shows nothing → you're on **local Docker**
-
-Alternatively:
-
-```bash
-docker info | grep Name
-```
-
-- If it shows `minikube` → minikube's Docker
-- If it shows your hostname (e.g. `ip-172-31-18-234`) → local Docker
-
-> **Tip:** Build images on local Docker and load them into minikube with `minikube image load <image>`. This avoids needing to switch Docker context.
+- Build images on local Docker and load into minikube with `minikube image load <image>` — avoids Docker context switching

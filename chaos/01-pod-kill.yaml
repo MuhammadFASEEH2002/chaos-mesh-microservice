@@ -1,15 +1,18 @@
 apiVersion: chaos-mesh.org/v1alpha1
-kind: PodChaos
+kind: Schedule
 metadata:
   name: pod-kill-experiment
   namespace: default
 spec:
-  action: pod-kill
-  mode: one
-  selector:
-    labelSelectors:
-      app: chaosmesh-microservice
-  duration: "30s"
-  gracePeriod: 0
-  scheduler:
-    cron: "*/1 * * * *"
+  schedule: "*/1 * * * *"
+  type: PodChaos
+  historyLimit: 5
+  concurrencyPolicy: Forbid
+  podChaos:
+    action: pod-kill
+    mode: one
+    selector:
+      labelSelectors:
+        app: chaosmesh-microservice
+    duration: "30s"
+    gracePeriod: 0

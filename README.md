@@ -76,7 +76,7 @@ The script automatically installs (skips if already present):
 
 ```bash
 # Make sure you're on local Docker (not minikube's)
-eval $(minikube docker-env -u)
+eval $(minikube docker-env --unset)
 
 # Build the image locally
 docker build -t chaosmesh-microservice .
@@ -256,8 +256,16 @@ kubectl delete -f chaos/
 kubectl get pods
 kubectl logs -l app=chaosmesh-microservice
 kubectl describe pod -l app=chaosmesh-microservice
-kubectl scale deployment chaosmesh-microservice --replicas=3
 kubectl rollout restart deployment chaosmesh-microservice
+
+# Stop everything (stop port-forward first, then scale down)
+./scripts/services/stop-app.sh
+kubectl scale deployment chaosmesh-microservice --replicas=0
+
+# Start everything (scale up first, wait for ready, then port-forward)
+kubectl scale deployment chaosmesh-microservice --replicas=5
+kubectl wait --for=condition=ready pod -l app=chaosmesh-microservice --timeout=60s
+./scripts/services/start-app.sh
 
 # Deployment management
 kubectl apply -f k8s/deployment.yaml

@@ -10,8 +10,8 @@ if [ -f /tmp/chaosmesh-app.pid ]; then
     rm -f /tmp/chaosmesh-app.pid
     echo "App process not found, cleaned up stale PID file."
   fi
-elif pgrep -f "port-forward.*chaosmesh-project" &> /dev/null; then
-  pkill -f "port-forward.*chaosmesh-project"
+elif pgrep -f "port-forward.*chaosmesh-microservice" &> /dev/null; then
+  pkill -f "port-forward.*chaosmesh-microservice"
   echo "App stopped."
 else
   echo "App is not running."

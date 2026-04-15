@@ -11,3 +11,5 @@ spec:
       app: chaosmesh-microservice
   duration: "30s"
   gracePeriod: 0
+  scheduler:
+    cron: "*/1 * * * *"

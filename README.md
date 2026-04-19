@@ -30,7 +30,6 @@ chaos-mesh-microservice/
 │   ├── user-service/         (index.js, package.json, Dockerfile)
 │   └── inventory-service/    (index.js, package.json, Dockerfile)
 ├── k8s/
-│   ├── mongodb.yaml
 │   ├── api-gateway.yaml
 │   ├── order-service.yaml
 │   ├── user-service.yaml

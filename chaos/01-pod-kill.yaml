@@ -13,6 +13,6 @@ spec:
     mode: one
     selector:
       labelSelectors:
-        app: chaosmesh-microservice
+        project: chaosmesh-microservice
     duration: "30s"
     gracePeriod: 0

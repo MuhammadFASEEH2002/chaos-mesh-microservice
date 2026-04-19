@@ -1,32 +1,41 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: chaosmesh-microservice
+  name: api-gateway
 spec:
-  replicas: 5
+  replicas: 3
   selector:
     matchLabels:
-      app: chaosmesh-microservice
+      app: api-gateway
   template:
     metadata:
       labels:
-        app: chaosmesh-microservice
+        app: api-gateway
+        project: chaosmesh-microservice
+        tier: frontend
     spec:
       containers:
-      - name: chaosmesh-microservice
-        image: chaosmesh-microservice
+      - name: api-gateway
+        image: api-gateway
         imagePullPolicy: Never
         ports:
         - containerPort: 3000
+        env:
+        - name: ORDER_SERVICE_URL
+          value: "http://order-service"
+        - name: USER_SERVICE_URL
+          value: "http://user-service"
+        - name: INVENTORY_SERVICE_URL
+          value: "http://inventory-service"
         livenessProbe:
           httpGet:
-            path: /health
+            path: /api/message
             port: 3000
           initialDelaySeconds: 10
           periodSeconds: 15
         readinessProbe:
           httpGet:
-            path: /health
+            path: /api/message
             port: 3000
           initialDelaySeconds: 5
           periodSeconds: 10
@@ -34,10 +43,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: chaosmesh-microservice
+  name: api-gateway
 spec:
   selector:
-    app: chaosmesh-microservice
+    app: api-gateway
   ports:
   - port: 80
     targetPort: 3000

@@ -1,13 +1,13 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: PodChaos
 metadata:
-  name: pod-failure-experiment
+  name: kill-mongodb-experiment
   namespace: default
 spec:
-  action: pod-failure
-  mode: fixed-percent
-  value: "40"
+  action: pod-kill
+  mode: all
   selector:
     labelSelectors:
-      project: chaosmesh-microservice
+      app: mongodb
   duration: "60s"
+  gracePeriod: 0

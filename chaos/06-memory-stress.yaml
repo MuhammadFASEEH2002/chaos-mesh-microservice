@@ -7,7 +7,7 @@ spec:
   mode: one
   selector:
     labelSelectors:
-      app: chaosmesh-microservice
+      project: chaosmesh-microservice
   stressors:
     memory:
       workers: 2

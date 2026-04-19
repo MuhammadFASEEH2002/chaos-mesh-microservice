@@ -1,26 +1,51 @@
-# Chaos Mesh Microservice
+# Chaos Mesh Microservice System
 
-A Node.js microservice deployed on Kubernetes (Minikube) with Chaos Mesh for chaos engineering experiments.
+A multi-microservice system deployed on Kubernetes (Minikube) with Chaos Mesh for chaos engineering experiments. The system features interdependent services to demonstrate realistic cascading failures.
+
+## Architecture
+
+```
+              [Browser]
+                  |
+           [API Gateway]  :3000 (NodePort 30000)
+              /        \
+     [Order Service]   [User Service]   (ClusterIP)
+              \        /
+        [Inventory Service]   (ClusterIP - leaf)
+```
+
+- **API Gateway** — Entry point. Routes requests to order, user, and inventory services. Reports aggregate health status.
+- **Order Service** — Manages orders. Calls inventory-service to enrich orders with product data.
+- **User Service** — Manages users. Calls inventory-service to get purchase history details.
+- **Inventory Service** — Leaf service with no dependencies. Manages product inventory. Killing this cascades failures to all other services.
+- **MongoDB** — Shared database. Each service uses its own database (inventory, orders, users). Killing MongoDB cascades failures to all services.
 
 ## Project Structure
 
 ```
 chaos-mesh-microservice/
-├── .dockerignore
-├── .gitignore
-├── Dockerfile
-├── index.js
-├── package.json
-├── pnpm-lock.yaml
-├── chaos/
-│   ├── 01-pod-kill.yaml
-│   ├── 02-pod-failure.yaml
-│   ├── 03-network-delay.yaml
-│   ├── 04-network-loss.yaml
-│   ├── 05-cpu-stress.yaml
-│   └── 06-memory-stress.yaml
+├── services/
+│   ├── api-gateway/          (index.js, package.json, Dockerfile)
+│   ├── order-service/        (index.js, package.json, Dockerfile)
+│   ├── user-service/         (index.js, package.json, Dockerfile)
+│   └── inventory-service/    (index.js, package.json, Dockerfile)
 ├── k8s/
-│   └── deployment.yaml
+│   ├── mongodb.yaml
+│   ├── api-gateway.yaml
+│   ├── order-service.yaml
+│   ├── user-service.yaml
+│   └── inventory-service.yaml
+├── chaos/
+│   ├── 01-pod-kill.yaml           (all services)
+│   ├── 02-pod-failure.yaml        (all services)
+│   ├── 03-network-delay.yaml      (all services)
+│   ├── 04-network-loss.yaml       (all services)
+│   ├── 05-cpu-stress.yaml         (all services)
+│   ├── 06-memory-stress.yaml      (all services)
+│   ├── 07-kill-inventory.yaml     (inventory only - cascading)
+│   ├── 08-delay-order-service.yaml (order-service only)
+│   ├── 09-network-partition.yaml  (frontend ↔ data partition)
+│   └── 10-kill-mongodb.yaml       (database - total failure)
 ├── scripts/
 │   ├── install/
 │   │   ├── install_docker_minikube.sh
@@ -29,6 +54,8 @@ chaos-mesh-microservice/
 │   │   ├── uninstall_docker_minikube.sh
 │   │   └── uninstall_docker_minikube_amazon_linux.sh
 │   └── services/
+│       ├── build-all.sh
+│       ├── deploy-all.sh
 │       ├── start-app.sh
 │       ├── stop-app.sh
 │       ├── start-dashboard.sh
@@ -72,45 +99,40 @@ The script automatically installs (skips if already present):
 - Helm
 - Chaos Mesh (via Helm)
 
-### 3. Build and deploy the microservice
+### 3. Build all service images
 
 ```bash
-# Make sure you're on local Docker (not minikube's)
-eval $(minikube docker-env --unset)
-
-# Build the image locally
-docker build -t chaosmesh-microservice .
-
-# Load the image into minikube
-minikube image load chaosmesh-microservice
-
-# Deploy to Kubernetes
-kubectl apply -f k8s/deployment.yaml
+chmod +x scripts/services/build-all.sh
+./scripts/services/build-all.sh
 ```
 
-> **Important:** Do NOT build inside minikube's Docker (`eval $(minikube docker-env)`) — it causes version mismatch errors. Always build on local Docker and use `minikube image load` to transfer the image.
+This builds Docker images for all 4 services and loads them into Minikube.
 
-**Low memory alternative:** If `minikube image load` gets killed (OOM), build directly inside minikube instead:
+**Low memory alternative:** If `minikube image load` gets killed (OOM), the script automatically falls back to `minikube image build`.
+
+### 4. Deploy all services
 
 ```bash
-minikube image build -t chaosmesh-microservice .
-kubectl apply -f k8s/deployment.yaml
+chmod +x scripts/services/deploy-all.sh
+./scripts/services/deploy-all.sh
 ```
 
-### 4. Verify deployment
+### 5. Verify deployment
 
 ```bash
-kubectl get pods
+kubectl get pods -l project=chaosmesh-microservice
 kubectl get svc
 ```
 
-## Accessing the Microservice
+Expected: 10 pods (1 mongodb + 3 gateway + 2 order + 2 user + 2 inventory), all Running.
+
+## Accessing the System
 
 ### From the server
 
 ```bash
 curl http://$(minikube ip):30000/health
-curl http://$(minikube ip):30000/api/message
+curl http://$(minikube ip):30000/api/status
 ```
 
 ### From your local machine
@@ -119,16 +141,38 @@ curl http://$(minikube ip):30000/api/message
 ./scripts/services/start-app.sh
 ```
 
-Then open: `http://<server-public-ip>:3000/health`
+Then open: `http://<server-public-ip>:3000`
 
 To stop: `./scripts/services/stop-app.sh`
 
 ## API Endpoints
 
-| Method | Endpoint       | Description                  |
-|--------|----------------|------------------------------|
-| GET    | `/health`      | Health check with timestamp  |
-| GET    | `/api/message` | Returns a status message     |
+### API Gateway (entry point)
+
+| Method | Endpoint          | Description                                    |
+|--------|-------------------|------------------------------------------------|
+| GET    | `/health`         | Aggregate health of all services               |
+| GET    | `/api/status`     | Detailed status with response times            |
+| GET    | `/api/orders`     | List orders (via order-service + inventory)     |
+| GET    | `/api/orders/:id` | Single order with product details              |
+| GET    | `/api/users`      | List users (via user-service)                  |
+| GET    | `/api/users/:id`  | User with purchase history (via inventory)     |
+| GET    | `/api/inventory`  | List inventory items                           |
+| GET    | `/api/message`    | Simple status message                          |
+
+### Internal Services
+
+| Service           | Endpoint              | Description              |
+|-------------------|-----------------------|--------------------------|
+| order-service     | `/health`             | Health + dependency check |
+| order-service     | `/api/orders`         | Orders with product data |
+| order-service     | `/api/orders/:id`     | Single order             |
+| user-service      | `/health`             | Health + dependency check |
+| user-service      | `/api/users`          | User list                |
+| user-service      | `/api/users/:id`      | User with purchases      |
+| inventory-service | `/health`             | Health check             |
+| inventory-service | `/api/inventory`      | All inventory items      |
+| inventory-service | `/api/inventory/:id`  | Single item              |
 
 ## Chaos Mesh Dashboard
 
@@ -152,14 +196,22 @@ Copy the token and paste it on the dashboard login page.
 
 ## Kubernetes Configuration
 
-- **Deployment**: 5 replicas of the Node.js app
-- **Service**: NodePort type, exposed on port 30000
-- **Health checks**: Liveness and readiness probes on `/health`
-- **Container port**: 3000
+| Service           | Replicas | Service Type | External Port | Database     |
+|-------------------|----------|-------------|---------------|--------------|
+| mongodb           | 1        | ClusterIP   | -             | -            |
+| api-gateway       | 3        | NodePort    | 30000         | none         |
+| order-service     | 2        | ClusterIP   | -             | orders       |
+| user-service      | 2        | ClusterIP   | -             | users        |
+| inventory-service | 2        | ClusterIP   | -             | inventory    |
+
+**Labels for chaos targeting:**
+- `project: chaosmesh-microservice` — targets all services
+- `app: <service-name>` — targets specific service (api-gateway, order-service, user-service, inventory-service, mongodb)
+- `tier: frontend|backend|data|database` — targets by tier
 
 ## Chaos Experiments
 
-All experiment YAMLs are in the `chaos/` folder. Run them in order (simple → severe).
+All experiment YAMLs are in the `chaos/` folder.
 
 ### How to run an experiment
 
@@ -171,77 +223,107 @@ kubectl apply -f chaos/<experiment-file>.yaml
 kubectl get pods -w
 
 # Check experiment status
-kubectl get podchaos,networkchaos,stresschaos
+kubectl get podchaos,networkchaos,stresschaos,schedule
 
-# Remove an experiment (stops it immediately)
+# Remove an experiment
 kubectl delete -f chaos/<experiment-file>.yaml
 ```
 
-### 1. Pod Kill — kills one random pod
+### System-Wide Experiments (target all services)
+
+#### 1. Pod Kill — kills one random pod every minute
 
 ```bash
 kubectl apply -f chaos/01-pod-kill.yaml
 ```
 
-- **What it does:** Kills 1 pod instantly
-- **Duration:** 30s (Kubernetes will recreate the pod)
-- **What to observe:** Run `kubectl get pods -w` — you should see a pod terminate and a new one spin up
-- **Test your app:** `curl http://<server-ip>:3000/health` — should still respond because other pods are alive
+- **What it does:** Kills 1 random pod from any service every minute
+- **What to observe:** `curl /api/status` shows which services are affected
 
-### 2. Pod Failure — makes 40% of pods unavailable
+#### 2. Pod Failure — makes 40% of pods unavailable
 
 ```bash
 kubectl apply -f chaos/02-pod-failure.yaml
 ```
 
-- **What it does:** Makes 40% of pods (2 out of 5) fail for 60s
-- **Duration:** 60s then auto-recovers
-- **What to observe:** 2 pods go to NotReady state, traffic routes to remaining 3
-- **Test your app:** Hit the health endpoint repeatedly — should still work but slower
+- **What it does:** Makes 40% of all pods fail for 60s
+- **What to observe:** Some services go down, gateway shows DEGRADED status
 
-### 3. Network Delay — adds 500ms latency
+#### 3. Network Delay — adds 500ms latency
 
 ```bash
 kubectl apply -f chaos/03-network-delay.yaml
 ```
 
-- **What it does:** Adds 500ms delay (±100ms jitter) to all pod network traffic
-- **Duration:** 60s
-- **What to observe:** API responses become noticeably slower
-- **Test your app:** `time curl http://<server-ip>:3000/health` — response time should be ~500ms+
+- **What it does:** Adds 500ms delay to all pod traffic
+- **What to observe:** `/api/status` shows increased response times, inter-service calls slow down
 
-### 4. Network Loss — drops 30% of packets
+#### 4. Network Loss — drops 30% of packets
 
 ```bash
 kubectl apply -f chaos/04-network-loss.yaml
 ```
 
-- **What it does:** Drops 30% of network packets on all pods
-- **Duration:** 60s
-- **What to observe:** Some requests fail, some succeed
-- **Test your app:** Run multiple curls — some will timeout or fail
+- **What it does:** Drops 30% of packets on all pods
+- **What to observe:** Intermittent failures on `/api/orders` and `/api/users`
 
-### 5. CPU Stress — overloads CPU
+#### 5. CPU Stress — overloads CPU
 
 ```bash
 kubectl apply -f chaos/05-cpu-stress.yaml
 ```
 
-- **What it does:** Uses 2 workers at 80% CPU load on 1 pod
-- **Duration:** 60s
-- **What to observe:** `kubectl top pod` shows high CPU on one pod, response times increase
-- **Test your app:** Hit the endpoint — the stressed pod will be slower
+- **What it does:** Uses 2 CPU workers at 80% on 1 random pod
+- **What to observe:** That pod's service slows down
 
-### 6. Memory Stress — consumes memory
+#### 6. Memory Stress — consumes memory
 
 ```bash
 kubectl apply -f chaos/06-memory-stress.yaml
 ```
 
-- **What it does:** Consumes 128MB memory on 1 pod using 2 workers
-- **Duration:** 60s
-- **What to observe:** `kubectl top pod` shows high memory usage, pod may get OOMKilled
-- **Test your app:** If pod gets killed, Kubernetes recreates it automatically
+- **What it does:** Consumes 128MB memory on 1 random pod
+- **What to observe:** Pod may get OOMKilled and auto-restart
+
+### Targeted Experiments (cascading failures)
+
+#### 7. Kill Inventory Service — cascading failure demo
+
+```bash
+kubectl apply -f chaos/07-kill-inventory.yaml
+```
+
+- **What it does:** Kills ALL inventory-service pods
+- **What to observe:** This is the best demo — hit `/api/status` and see inventory DOWN, then `/api/orders` shows `"inventory-service unavailable"` in product data, `/api/users/:id` shows unavailable purchase details
+- **Why it matters:** Shows how a leaf service failure cascades through the entire system
+
+#### 8. Delay Order Service — partial degradation
+
+```bash
+kubectl apply -f chaos/08-delay-order-service.yaml
+```
+
+- **What it does:** Adds 500ms delay to order-service only
+- **What to observe:** `/api/orders` becomes slow but `/api/users` stays fast — demonstrates partial degradation
+
+#### 9. Network Partition — frontend/data split
+
+```bash
+kubectl apply -f chaos/09-network-partition.yaml
+```
+
+- **What it does:** Partitions frontend tier (gateway) from data tier (inventory)
+- **What to observe:** Gateway can't reach inventory directly, but order/user services (backend tier) may still reach it
+
+#### 10. Kill MongoDB — total database failure
+
+```bash
+kubectl apply -f chaos/10-kill-mongodb.yaml
+```
+
+- **What it does:** Kills the MongoDB pod
+- **What to observe:** All services report `mongodb: DOWN` in health checks. `/api/orders`, `/api/users`, `/api/inventory` return `"Database unavailable"`. Gateway shows DEGRADED status for all services.
+- **Why it matters:** Demonstrates total system failure when the shared database goes down
 
 ### Cleanup all experiments
 
@@ -253,29 +335,29 @@ kubectl delete -f chaos/
 
 ```bash
 # Pod management
-kubectl get pods
-kubectl logs -l app=chaosmesh-microservice
-kubectl describe pod -l app=chaosmesh-microservice
-kubectl rollout restart deployment chaosmesh-microservice
+kubectl get pods -l project=chaosmesh-microservice
+kubectl logs -l app=api-gateway
+kubectl logs -l app=order-service
+kubectl logs -l app=inventory-service
+kubectl rollout restart deployment api-gateway order-service user-service inventory-service
 
 # Stop everything (stop port-forward first, then scale down)
 ./scripts/services/stop-app.sh
-kubectl scale deployment chaosmesh-microservice --replicas=0
+kubectl scale deployment api-gateway order-service user-service inventory-service --replicas=0
 
 # Start everything (scale up first, wait for ready, then port-forward)
-kubectl scale deployment chaosmesh-microservice --replicas=5
-kubectl wait --for=condition=ready pod -l app=chaosmesh-microservice --timeout=60s
+kubectl scale deployment api-gateway --replicas=3
+kubectl scale deployment order-service user-service inventory-service --replicas=2
+kubectl wait --for=condition=ready pod -l project=chaosmesh-microservice --timeout=60s
 ./scripts/services/start-app.sh
 
-# Deployment management
-kubectl apply -f k8s/deployment.yaml
-kubectl delete -f k8s/deployment.yaml
-kubectl rollout status deployment chaosmesh-microservice
+# Rebuild and redeploy a single service
+docker build -t order-service services/order-service
+minikube image load order-service
+kubectl rollout restart deployment order-service
 
-# Docker image management
-docker build -t chaosmesh-microservice .
-minikube image load chaosmesh-microservice
-minikube image build -t chaosmesh-microservice .    # low memory alternative
+# Revert Docker env to host (if you used minikube docker-env)
+eval $(minikube docker-env --unset)
 ```
 
 ## Troubleshooting
@@ -309,7 +391,29 @@ minikube start --driver=docker
 After `minikube start` succeeds, re-run the install script to reinstall Chaos Mesh, then redeploy:
 
 ```bash
-kubectl apply -f k8s/deployment.yaml
+./scripts/services/deploy-all.sh
+```
+
+### Port-forward dies immediately
+
+Check the log for errors:
+
+```bash
+cat /tmp/chaosmesh-app.log
+```
+
+Common causes:
+- Service name mismatch — verify with `kubectl get svc`
+- Port already in use — kill any `pnpm` or `node` process on port 3000
+- Pods not ready — wait for pods: `kubectl wait --for=condition=ready pod -l app=api-gateway --timeout=60s`
+
+### Service endpoints empty
+
+If `kubectl describe svc <name>` shows `Endpoints: <none>`, the service selector doesn't match pod labels. Verify labels:
+
+```bash
+kubectl get pods --show-labels
+kubectl describe svc <service-name>
 ```
 
 ## Uninstall

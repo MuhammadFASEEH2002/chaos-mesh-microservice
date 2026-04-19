@@ -8,7 +8,7 @@ spec:
   mode: all
   selector:
     labelSelectors:
-      app: chaosmesh-microservice
+      project: chaosmesh-microservice
   delay:
     latency: "500ms"
     jitter: "100ms"

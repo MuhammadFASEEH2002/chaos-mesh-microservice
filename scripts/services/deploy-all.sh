@@ -2,10 +2,37 @@
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
-echo "Deploying MongoDB..."
-kubectl apply -f "$REPO_ROOT/k8s/mongodb.yaml"
-echo "Waiting for MongoDB to be ready..."
-kubectl wait --for=condition=ready pod -l app=mongodb --timeout=120s
+append_db() {
+  local base="$1" db="$2"
+  if [[ "$base" == *"/?"* ]]; then
+    echo "${base/\/\?/\/${db}?}"
+  elif [[ "$base" == */ ]]; then
+    echo "${base}${db}"
+  else
+    echo "${base}/${db}"
+  fi
+}
+
+echo "Enter MongoDB Atlas base URI (input hidden)."
+echo "Example: mongodb+srv://user:pass@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority"
+read -r -s -p "URI: " MONGO_BASE_URI
+echo ""
+
+if [ -z "$MONGO_BASE_URI" ]; then
+  echo "Error: URI cannot be empty."
+  exit 1
+fi
+
+USER_URI=$(append_db "$MONGO_BASE_URI" "users")
+ORDER_URI=$(append_db "$MONGO_BASE_URI" "orders")
+INVENTORY_URI=$(append_db "$MONGO_BASE_URI" "inventory")
+
+echo "Creating mongo-secret..."
+kubectl create secret generic mongo-secret \
+  --from-literal=user-uri="$USER_URI" \
+  --from-literal=order-uri="$ORDER_URI" \
+  --from-literal=inventory-uri="$INVENTORY_URI" \
+  --dry-run=client -o yaml | kubectl apply -f -
 
 echo ""
 echo "Deploying all services..."

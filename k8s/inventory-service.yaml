@@ -22,7 +22,10 @@ spec:
         - containerPort: 3000
         env:
         - name: MONGO_URI
-          value: "mongodb://root:chaospass@mongodb:27017/inventory?authSource=admin"
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: inventory-uri
         livenessProbe:
           httpGet:
             path: /health

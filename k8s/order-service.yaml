@@ -24,7 +24,10 @@ spec:
         - name: INVENTORY_SERVICE_URL
           value: "http://inventory-service"
         - name: MONGO_URI
-          value: "mongodb://root:chaospass@mongodb:27017/orders?authSource=admin"
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: order-uri
         livenessProbe:
           httpGet:
             path: /health

@@ -437,3 +437,35 @@ This removes: Chaos Mesh, Minikube, Helm, kubectl, and Docker (in reverse order)
 - Check IP anytime: `minikube ip`
 - Minikube needs at least 1800MB RAM available to Docker
 - Build images on local Docker and load into minikube with `minikube image load <image>` — avoids Docker context switching
+
+
+
+Special note 
+# 1. Go to the repo root    cd ~/chaos-mesh-microservice                                                                                                                                       
+                                                                                                                                                                     
+  # 2. Confirm you're in the right place (should list all four service dirs)                                                                                           ls services/                                                                                                                                                       
+                                                                                                                                                                       # 3. Make sure docker-env is NOT pointing at minikube (we want minikube's own builder)                                                                             
+  eval $(minikube docker-env --unset)                                                                                                                                
+  
+  # 4. Build each service inside minikube
+  minikube image build -t api-gateway       services/api-gateway
+  minikube image build -t user-service      services/user-service
+  minikube image build -t order-service     services/order-service
+  minikube image build -t inventory-service services/inventory-service
+
+  # 5. Verify all four are present
+  minikube image ls | grep -E "api-gateway|user-service|order-service|inventory-service"
+
+  Expected output from step 5:
+  docker.io/library/api-gateway:latest
+  docker.io/library/user-service:latest
+  docker.io/library/order-service:latest
+  docker.io/library/inventory-service:latest
+
+  Then proceed to deploy:
+
+  ./scripts/services/deploy-all.sh
+
+※ recap: You're getting the four microservices running on minikube after an EC2 instance-type change broke `minikube image load`. Next: from 
+  `~/chaos-mesh-microservice`, run `minikube image build -t <svc> services/<svc>` for all four services, then `./scripts/services/deploy-all.sh`.
+  

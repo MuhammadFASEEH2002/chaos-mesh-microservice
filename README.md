@@ -469,3 +469,5 @@ Special note
 ※ recap: You're getting the four microservices running on minikube after an EC2 instance-type change broke `minikube image load`. Next: from 
   `~/chaos-mesh-microservice`, run `minikube image build -t <svc> services/<svc>` for all four services, then `./scripts/services/deploy-all.sh`.
   
+kubectl rollout restart deploy/inventory-service deploy/user-service deploy/order-service
+  kubectl rollout status deploy/order-service

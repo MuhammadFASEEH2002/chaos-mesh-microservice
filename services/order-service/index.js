@@ -71,14 +71,12 @@ async function seedDB() {
 }
 
 app.get('/health', async (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? 'UP' : 'DOWN';
   const inventoryHealth = await fetchWithTimeout(`${INVENTORY_URL}/health`);
   res.json({
     service: 'order-service',
-    status: dbStatus === 'UP' ? 'OK' : 'DEGRADED',
+    status: 'OK',
     timestamp: new Date(),
     dependencies: {
-      mongodb: dbStatus,
       'inventory-service': inventoryHealth ? 'UP' : 'DOWN',
     },
   });

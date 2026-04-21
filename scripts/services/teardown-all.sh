@@ -30,17 +30,26 @@ pkill -f "port-forward.*api-gateway" 2>/dev/null
 
 echo ""
 if [ -d "$REPO_ROOT/chaos" ] && ls "$REPO_ROOT/chaos/"*.yaml >/dev/null 2>&1; then
-  echo "Deleting chaos experiments (30s timeout)..."
-  kubectl delete -f "$REPO_ROOT/chaos/" --ignore-not-found --wait=false --timeout=30s 2>/dev/null
+  if ! kubectl get crd podchaos.chaos-mesh.org >/dev/null 2>&1; then
+    echo "Skipping chaos experiments (Chaos Mesh CRDs not installed)."
+  else
+    STUCK=$(timeout 10 kubectl get podchaos,networkchaos,stresschaos,iochaos -o name 2>/dev/null)
+    if [ -z "$STUCK" ]; then
+      echo "Skipping chaos experiments (none found)."
+    else
+      echo "Deleting chaos experiments (30s timeout)..."
+      timeout 30 kubectl delete -f "$REPO_ROOT/chaos/" --ignore-not-found --wait=false 2>/dev/null
 
-  echo "Checking for stuck chaos resources..."
-  STUCK=$(kubectl get podchaos,networkchaos,stresschaos,iochaos -o name 2>/dev/null)
-  if [ -n "$STUCK" ]; then
-    echo "Force-removing finalizers on stuck experiments..."
-    for res in $STUCK; do
-      kubectl patch "$res" --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null
-      kubectl delete "$res" --ignore-not-found --wait=false --grace-period=0 --force 2>/dev/null
-    done
+      echo "Checking for stuck chaos resources..."
+      STUCK=$(timeout 10 kubectl get podchaos,networkchaos,stresschaos,iochaos -o name 2>/dev/null)
+      if [ -n "$STUCK" ]; then
+        echo "Force-removing finalizers on stuck experiments..."
+        for res in $STUCK; do
+          timeout 10 kubectl patch "$res" --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null
+          timeout 10 kubectl delete "$res" --ignore-not-found --wait=false --grace-period=0 --force 2>/dev/null
+        done
+      fi
+    fi
   fi
 else
   echo "Skipping chaos experiments (no manifests found)."
@@ -54,6 +63,8 @@ delete_manifest_if_exists "$REPO_ROOT/k8s/order-service.yaml"
 delete_manifest_if_exists "$REPO_ROOT/k8s/inventory-service.yaml"
 
 echo ""
+delete_if_exists deployment mongodb
+delete_if_exists service mongodb
 delete_if_exists secret mongo-secret
 
 echo ""

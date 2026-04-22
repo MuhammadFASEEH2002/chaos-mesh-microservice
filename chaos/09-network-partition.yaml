@@ -1,18 +1,23 @@
 apiVersion: chaos-mesh.org/v1alpha1
-kind: NetworkChaos
+kind: Schedule
 metadata:
   name: network-partition-experiment
   namespace: default
 spec:
-  action: partition
-  mode: all
-  selector:
-    labelSelectors:
-      tier: frontend
-  direction: both
-  target:
+  schedule: "@yearly"
+  type: NetworkChaos
+  historyLimit: 5
+  concurrencyPolicy: Forbid
+  networkChaos:
+    action: partition
     mode: all
     selector:
       labelSelectors:
-        tier: data
-  duration: "60s"
+        tier: frontend
+    direction: both
+    target:
+      mode: all
+      selector:
+        labelSelectors:
+          tier: data
+    duration: "60s"

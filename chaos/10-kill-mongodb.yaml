@@ -1,13 +1,18 @@
 apiVersion: chaos-mesh.org/v1alpha1
-kind: PodChaos
+kind: Schedule
 metadata:
   name: kill-mongodb-experiment
   namespace: default
 spec:
-  action: pod-kill
-  mode: all
-  selector:
-    labelSelectors:
-      app: mongodb
-  duration: "60s"
-  gracePeriod: 0
+  schedule: "@yearly"
+  type: PodChaos
+  historyLimit: 5
+  concurrencyPolicy: Forbid
+  podChaos:
+    action: pod-kill
+    mode: all
+    selector:
+      labelSelectors:
+        app: mongodb
+    duration: "60s"
+    gracePeriod: 0

@@ -1,15 +1,20 @@
 apiVersion: chaos-mesh.org/v1alpha1
-kind: StressChaos
+kind: Schedule
 metadata:
   name: memory-stress-experiment
   namespace: default
 spec:
-  mode: one
-  selector:
-    labelSelectors:
-      project: chaosmesh-microservice
-  stressors:
-    memory:
-      workers: 2
-      size: "128MB"
-  duration: "60s"
+  schedule: "@yearly"
+  type: StressChaos
+  historyLimit: 5
+  concurrencyPolicy: Forbid
+  stressChaos:
+    mode: one
+    selector:
+      labelSelectors:
+        project: chaosmesh-microservice
+    stressors:
+      memory:
+        workers: 2
+        size: "128MB"
+    duration: "60s"

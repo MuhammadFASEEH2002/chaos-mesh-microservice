@@ -4,7 +4,7 @@ metadata:
   name: pod-kill-experiment
   namespace: default
 spec:
-  schedule: "@yearly"
+  schedule: "*/1 * * * *"
   type: PodChaos
   historyLimit: 5
   concurrencyPolicy: Forbid

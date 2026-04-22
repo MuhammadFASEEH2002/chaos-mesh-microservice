@@ -1,20 +1,15 @@
 apiVersion: chaos-mesh.org/v1alpha1
-kind: Schedule
+kind: NetworkChaos
 metadata:
   name: network-loss-experiment
   namespace: default
 spec:
-  schedule: "@yearly"
-  type: NetworkChaos
-  historyLimit: 5
-  concurrencyPolicy: Forbid
-  networkChaos:
-    action: loss
-    mode: all
-    selector:
-      labelSelectors:
-        project: chaosmesh-microservice
-    loss:
-      loss: "30"
-      correlation: "50"
-    duration: "60s"
+  action: loss
+  mode: all
+  selector:
+    labelSelectors:
+      project: chaosmesh-microservice
+  loss:
+    loss: "30"
+    correlation: "50"
+  duration: "60s"

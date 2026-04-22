@@ -1,21 +1,16 @@
 apiVersion: chaos-mesh.org/v1alpha1
-kind: Schedule
+kind: NetworkChaos
 metadata:
   name: delay-order-service-experiment
   namespace: default
 spec:
-  schedule: "@yearly"
-  type: NetworkChaos
-  historyLimit: 5
-  concurrencyPolicy: Forbid
-  networkChaos:
-    action: delay
-    mode: all
-    selector:
-      labelSelectors:
-        app: order-service
-    delay:
-      latency: "500ms"
-      jitter: "100ms"
-      correlation: "50"
-    duration: "60s"
+  action: delay
+  mode: all
+  selector:
+    labelSelectors:
+      app: order-service
+  delay:
+    latency: "500ms"
+    jitter: "100ms"
+    correlation: "50"
+  duration: "60s"

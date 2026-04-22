@@ -1,18 +1,13 @@
 apiVersion: chaos-mesh.org/v1alpha1
-kind: Schedule
+kind: PodChaos
 metadata:
   name: kill-inventory-experiment
   namespace: default
 spec:
-  schedule: "@yearly"
-  type: PodChaos
-  historyLimit: 5
-  concurrencyPolicy: Forbid
-  podChaos:
-    action: pod-kill
-    mode: all
-    selector:
-      labelSelectors:
-        app: inventory-service
-    duration: "60s"
-    gracePeriod: 0
+  action: pod-kill
+  mode: all
+  selector:
+    labelSelectors:
+      app: inventory-service
+  duration: "60s"
+  gracePeriod: 0

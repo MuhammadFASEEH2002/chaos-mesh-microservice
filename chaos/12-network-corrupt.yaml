@@ -1,0 +1,15 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: network-corrupt-experiment
+  namespace: default
+spec:
+  action: corrupt
+  mode: all
+  selector:
+    labelSelectors:
+      app: order-service
+  corrupt:
+    corrupt: "20"
+    correlation: "50"
+  duration: "60s"

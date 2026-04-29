@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: network-bandwidth-experiment
+  namespace: default
+spec:
+  action: bandwidth
+  mode: all
+  selector:
+    labelSelectors:
+      app: inventory-service
+  bandwidth:
+    rate: "1mbps"
+    limit: 20971520
+    buffer: 10000
+  duration: "60s"

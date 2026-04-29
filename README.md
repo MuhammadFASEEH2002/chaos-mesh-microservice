@@ -324,6 +324,85 @@ kubectl apply -f chaos/10-kill-mongodb.yaml
 - **What to observe:** All services report `mongodb: DOWN` in health checks. `/api/orders`, `/api/users`, `/api/inventory` return `"Database unavailable"`. Gateway shows DEGRADED status for all services.
 - **Why it matters:** Demonstrates total system failure when the shared database goes down
 
+### Advanced Experiments (protocol-level and clock chaos)
+
+#### 11. Container Kill — kills the container, not the pod
+
+```bash
+kubectl apply -f chaos/11-container-kill.yaml
+```
+
+- **What it does:** Kills only the `api-gateway` container inside one pod (kubelet auto-restarts the container in-place)
+- **What to observe:** Pod stays in same `Running` state but its `RESTARTS` count increments. Brief 5xx blip on requests routed to that pod.
+- **Why it matters:** Differentiates container-level failure (kubelet recovery) from pod-level failure (scheduler reschedule).
+
+#### 12. Network Corrupt — corrupts 20% of packets
+
+```bash
+kubectl apply -f chaos/12-network-corrupt.yaml
+```
+
+- **What it does:** Corrupts 20% of packets in/out of `order-service`
+- **What to observe:** Intermittent JSON parse errors and connection resets between gateway and order-service.
+
+#### 13. Network Bandwidth — throttles to 1 Mbps
+
+```bash
+kubectl apply -f chaos/13-network-bandwidth.yaml
+```
+
+- **What it does:** Caps `inventory-service` network bandwidth at 1 Mbps
+- **What to observe:** `/api/inventory` response times balloon as the response gets serialized over the throttled link.
+
+#### 14. Network Duplicate — duplicates 30% of packets
+
+```bash
+kubectl apply -f chaos/14-network-duplicate.yaml
+```
+
+- **What it does:** Duplicates 30% of packets in/out of `user-service`
+- **What to observe:** Slightly higher latency and unusual TCP retransmit patterns; usually no functional impact (TCP dedupes).
+
+#### 15. HTTP Abort — aborts `/api/orders*` at the gateway
+
+```bash
+kubectl apply -f chaos/15-http-abort.yaml
+kubectl rollout restart deploy/api-gateway   # required: injects HTTP sidecar
+```
+
+- **What it does:** Aborts every HTTP request matching `/api/orders*` on the gateway pod
+- **What to observe:** `/api/orders` immediately returns connection-reset; `/api/users` and `/api/inventory` still work.
+
+#### 16. HTTP Delay — adds 3s delay to `/api/users*`
+
+```bash
+kubectl apply -f chaos/16-http-delay.yaml
+kubectl rollout restart deploy/api-gateway   # required: injects HTTP sidecar
+```
+
+- **What it does:** Delays all `/api/users*` requests on the gateway by 3 seconds
+- **What to observe:** Selective slowdown of one route only; great for testing client-side timeout behavior.
+
+#### 17. DNS Error — break service discovery
+
+```bash
+kubectl apply -f chaos/17-dns-error.yaml
+```
+
+- **What it does:** Makes `order-service` fail to resolve any `inventory-service.*` DNS name
+- **What to observe:** Order-service can't reach inventory-service; `/api/orders` returns dummy data with `"inventory-service unavailable"` enrichment errors.
+
+#### 18. Time Skew — clock drift
+
+```bash
+kubectl apply -f chaos/18-time-skew.yaml
+```
+
+- **What it does:** Shifts `order-service`'s clock 5 minutes ahead
+- **What to observe:** New orders show timestamps 5 min in the future. Demonstrates how clock skew breaks JWT expiration, log ordering, and time-windowed queries.
+
+> **Note:** HTTPChaos (15, 16) and TimeChaos (18) require the chaos-mesh sidecar to be injected. Always restart the target deployment after applying these.
+
 ### Cleanup all experiments
 
 ```bash

@@ -4,7 +4,8 @@ metadata:
   name: http-abort-experiment
   namespace: default
 spec:
-  mode: all
+  mode: fixed
+  value: "2"
   selector:
     labelSelectors:
       app: api-gateway
@@ -12,4 +13,4 @@ spec:
   port: 3000
   path: "/api/orders*"
   abort: true
-  duration: "60s"
+  duration: "300s"
